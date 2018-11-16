@@ -1,3 +1,3 @@
 # A Keras CycleGAN for nifti data  
-## Run from ternimal  
+Run from ternimal:  
 python test.py

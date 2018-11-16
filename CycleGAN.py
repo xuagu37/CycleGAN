@@ -226,7 +226,7 @@ class CycleGAN():
                 target_data.append(ones)
                 G_loss = self.G_model.train_on_batch(x=[train_A_batch, train_B_batch], y=target_data)
                 self.print_info(start_time, epoch_i, loop_j, D_loss, G_loss, DA_loss_train + DA_loss_synthetic, DB_loss_train + DB_loss_synthetic)
-            if (epoch_i+1) % 2 == 0:
+            if (epoch_i+1) % 20 == 0:
                 self.save_model(epoch_i)
 
     def synthesize(self, G_X2Y, G_X2Y_dir, test_X_dir, synthetic_Y_dir):

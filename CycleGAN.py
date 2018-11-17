@@ -21,26 +21,13 @@ import datetime
 tf.logging.set_verbosity(tf.logging.ERROR)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'  # or any {'0', '1', '2'}
 
-
+print('CycleGAN loaded...')
 
 class CycleGAN():
-    def __init__(self, train_A_dir, train_B_dir, models_dir, batch_size):
-        print('Creating a CycleGAN ...')
+    def __init__(self):
+        print('Initializing a CycleGAN ...')
+
         self.normalization = InstanceNormalization
-
-        # Data dir
-        self.train_A_dir = train_A_dir
-        self.train_B_dir = train_B_dir
-        if not os.path.exists(models_dir):
-            os.makedirs(models_dir)
-        self.models_dir = models_dir
-        print('Loading  training data A ...')
-        self.train_A = load_data(self.train_A_dir)
-        print('Loading  training data B ...')
-        self.train_B = load_data(self.train_B_dir)
-        self.data_shape = self.train_A.shape[1:4]
-        self.data_num = self.train_A.shape[0]
-
         # Hyper parameters
         self.lr_D = 2e-4
         self.lr_G = 2e-4
@@ -49,22 +36,12 @@ class CycleGAN():
         self.lambda_1 = 10.0  # Cyclic loss weight A_2_B
         self.lambda_2 = 10.0  # Cyclic loss weight B_2_A
         self.lambda_D = 1.0  # Weight for loss from discriminator guess on synthetic images
-        self.batch_size = batch_size
-        self.epochs = 200
         self.synthetic_pool_size = 50
-        self.decay_epoch = 101 # the epoch where linear decay of the learning rates starts
-
-        self.loop_num = self.data_num // self.batch_size
-        print('Number of epoches: {}, number of loops per epoch: {}'.format(self.epochs, self.loop_num))
-
         # optimizer
         self.opt_D = Adam(self.lr_D, self.beta_1, self.beta_2)
         self.opt_G = Adam(self.lr_G, self.beta_1, self.beta_2)
 
-        # Image pools used to update the discriminators
-        self.synthetic_A_pool = ImagePool(self.synthetic_pool_size)
-        self.synthetic_B_pool = ImagePool(self.synthetic_pool_size)
-
+    def create_discriminator_and_generator(self):
         # Discriminator
         D_A = self.Discriminator()
         D_B = self.Discriminator()
@@ -102,13 +79,6 @@ class CycleGAN():
         model_outputs.append(dB_guess_synthetic)
         self.G_model = Model(inputs=[real_A, real_B], outputs=model_outputs, name='G_model')
         self.G_model.compile(optimizer=self.opt_G, loss=compile_losses, loss_weights=compile_weights)
-
-        # TensorFlow wizardry
-        config = tf.ConfigProto()
-        # Don't pre-allocate memory; allocate as-needed
-        config.gpu_options.allow_growth = True
-        # Create a session with the above options specified.
-        K.tensorflow_backend.set_session(tf.Session(config=config))
 
     def ck(self, x, k, use_normalization):
         x = Conv2D(filters=k, kernel_size=4, strides=2, padding='same')(x)
@@ -188,16 +158,49 @@ class CycleGAN():
         return Model(input=input_img, output=x, name=name)
 
 
-    def train(self):
-        start_time = time.time()
-        print('Training ...')
+    def train(self, train_A_dir, normalization_factor_A, train_B_dir, normalization_factor_B, models_dir, batch_size=10, epochs=200, output_sample_flag=False, output_sample_dir=None):
+        self.batch_size = batch_size
+        self.epochs = epochs
+        self.decay_epoch = self.epochs//2 # the epoch where linear decay of the learning rates starts
+
+        # Data dir
+        self.train_A_dir = train_A_dir
+        self.train_B_dir = train_B_dir
+        if not os.path.exists(models_dir):
+            os.makedirs(models_dir)
+        self.models_dir = models_dir
+        print('Loading training data A ...')
+        self.train_A = load_data(self.train_A_dir)/normalization_factor_A
+        print('Loading training data B ...')
+        self.train_B = load_data(self.train_B_dir)/normalization_factor_B
+        self.data_shape = self.train_A.shape[1:4]
+        self.data_num = self.train_A.shape[0]
+        self.loop_num = self.data_num // self.batch_size
+        print('Number of epochs: {}, number of loops per epoch: {}'.format(self.epochs, self.loop_num))
+        print('Creating Discriminator and Generator ...')
+        self.create_discriminator_and_generator()
+        # TensorFlow wizardry
+        config = tf.ConfigProto()
+        # Don't pre-allocate memory; allocate as-needed
+        config.gpu_options.allow_growth = True
+        # Create a session with the above options specified.
+        K.tensorflow_backend.set_session(tf.Session(config=config))
+
         DA_losses = []
         DB_losses = []
         D_losses = []
         G_losses = []
+
+        # Image pools used to update the discriminators
+        self.synthetic_A_pool = ImagePool(self.synthetic_pool_size)
+        self.synthetic_B_pool = ImagePool(self.synthetic_pool_size)
+
         label_shape = (self.batch_size,) + self.D_A.output_shape[1:]
         ones = np.ones(shape=label_shape)
         zeros = ones * 0
+        decay_D, decay_G = self.get_lr_linear_decay_rate()
+        start_time = time.time()
+        print('Training ...')
         for epoch_i in range(self.epochs):
             # Update learning rates
             if epoch_i > self.decay_epoch:
@@ -215,6 +218,8 @@ class CycleGAN():
                 synthetic_A_batch = self.G_B2A.predict(train_B_batch)
                 synthetic_A_batch = self.synthetic_A_pool.query(synthetic_A_batch)
                 synthetic_B_batch = self.synthetic_B_pool.query(synthetic_B_batch)
+
+                # Train Discriminator
                 DA_loss_train = self.D_A.train_on_batch(x=train_A_batch, y=ones)
                 DB_loss_train = self.D_B.train_on_batch(x=train_B_batch, y=ones)
                 DA_loss_synthetic = self.D_A.train_on_batch(x=synthetic_A_batch, y=zeros)
@@ -224,21 +229,31 @@ class CycleGAN():
                 target_data = [train_A_batch, train_B_batch]
                 target_data.append(ones)
                 target_data.append(ones)
+                # Train Generator
                 G_loss = self.G_model.train_on_batch(x=[train_A_batch, train_B_batch], y=target_data)
                 self.print_info(start_time, epoch_i, loop_j, D_loss, G_loss, DA_loss_train + DA_loss_synthetic, DB_loss_train + DB_loss_synthetic)
+                if (output_sample_flag):
+                    if (loop_j+1) % 5 == 0:
+                        #output_sample = np.concatenate((np.concatenate((np.rot90(train_A_batch[0,:,:,self.data_shape[2]//3])/np.percentile(train_A_batch, 99), np.rot90(synthetic_B_batch[0,:,:,self.data_shape[2]//3])/np.percentile(synthetic_B_batch, 99)), axis=1), np.concatenate((np.rot90(train_B_batch[0,:,:,self.data_shape[2]//3])/np.percentile(train_B_batch, 99), np.rot90(synthetic_A_batch[0,:,:,self.data_shape[2]//3])/np.percentile(synthetic_A_batch, 99)), axis=1)), axis=0)
+                        output_sample = np.concatenate((np.concatenate((np.rot90(train_A_batch[0,:,:,self.data_shape[2]//3]), np.rot90(synthetic_B_batch[0,:,:,self.data_shape[2]//3])), axis=1), np.concatenate((np.rot90(train_B_batch[0,:,:,self.data_shape[2]//3]), np.rot90(synthetic_A_batch[0,:,:,self.data_shape[2]//3])), axis=1)), axis=0)
+                        toimage(output_sample, cmin=0, cmax=1).save(output_sample_dir)
             if (epoch_i+1) % 20 == 0:
                 self.save_model(epoch_i)
+            print("\u001b[12B")
+            print("\u001b[1000D")
+            print('Done')
 
-    def synthesize(self, G_X2Y, G_X2Y_dir, test_X_dir, synthetic_Y_dir):
+    def synthesize(self, G_X2Y, G_X2Y_dir, test_X_dir, normalization_factor_X, synthetic_Y_dir, normalization_factor_Y):
+        print('Loading test data ...')
         test_X_img = nib.load(test_X_dir)
-        test_X = load_data(test_X_dir)
+        test_X = load_data(test_X_dir)/normalization_factor_X
         if G_X2Y == 'G_A2B':
             self.G_A2B.load_weights(G_X2Y_dir)
             synthetic_Y = self.G_A2B.predict(test_X)
         elif G_X2Y == 'G_B2A':
             self.G_B2A.load_weights(G_X2Y_dir)
             synthetic_Y = self.G_B2A.predict(test_X)
-        synthetic_Y = np.transpose(synthetic_Y, (1, 2, 3, 0))
+        synthetic_Y = np.transpose(synthetic_Y, (1, 2, 3, 0))*normalization_factor_Y
         synthetic_Y = synthetic_Y[0:test_X_img.shape[0], 0:test_X_img.shape[1], :, :]
         synthetic_Y_img = nib.Nifti1Image(synthetic_Y, test_X_img.affine, test_X_img.header)
         nib.save(synthetic_Y_img, synthetic_Y_dir)
@@ -289,13 +304,14 @@ class CycleGAN():
         sys.stdout.flush()
 
     def save_model(self, epoch_i):
-        models_dir_epoch_i = os.path.join(self.models_dir, '{}_weights_epoch_{}.hdf5'.format(self.G_A2B.name, epoch_i))
+        models_dir_epoch_i = os.path.join(self.models_dir, '{}_weights_epoch_{}.hdf5'.format(self.G_A2B.name, epoch_i+1))
         self.G_A2B.save_weights(models_dir_epoch_i)
-        models_dir_epoch_i = os.path.join(self.models_dir, '{}_weights_epoch_{}.hdf5'.format(self.G_B2A.name, epoch_i))
+        models_dir_epoch_i = os.path.join(self.models_dir, '{}_weights_epoch_{}.hdf5'.format(self.G_B2A.name, epoch_i+1))
         self.G_B2A.save_weights(models_dir_epoch_i)
 
 def load_data(data_dir):
         data = nib.load(data_dir).get_fdata()
+        data.clip(0)
         data = np.transpose(data, (3, 0, 1, 2))
         print('data size: {}, number of data: {}'.format(data.shape[1:4], data.shape[0]))
         if (data.shape[1]%4 != 0):

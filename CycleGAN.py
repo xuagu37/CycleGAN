@@ -239,8 +239,8 @@ class CycleGAN():
                         toimage(output_sample, cmin=0, cmax=1).save(output_sample_dir)
             if (epoch_i+1) % 20 == 0:
                 self.save_model(epoch_i)
-            print("\u001b[12B")
-            print("\u001b[1000D")
+        print("\u001b[12B")
+        print("\u001b[1000D")
         print('Done')
 
     def synthesize(self, G_X2Y, G_X2Y_dir, test_X_dir, normalization_factor_X, synthetic_Y_dir, normalization_factor_Y):

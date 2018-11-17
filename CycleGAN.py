@@ -158,10 +158,11 @@ class CycleGAN():
         return Model(inputs=input_img, outputs=x, name=name)
 
 
-    def train(self, train_A_dir, normalization_factor_A, train_B_dir, normalization_factor_B, models_dir, batch_size=10, epochs=200, output_sample_flag=False, output_sample_dir=None):
+    def train(self, train_A_dir, normalization_factor_A, train_B_dir, normalization_factor_B, models_dir, batch_size=10, epochs=200, cycle_loss_type='L1_SSIM', output_sample_flag=False, output_sample_dir=None):
         self.batch_size = batch_size
         self.epochs = epochs
         self.decay_epoch = self.epochs//2 # the epoch where linear decay of the learning rates starts
+        self.cycle_loss_type = cycle_loss_type
 
         # Data dir
         self.train_A_dir = train_A_dir
@@ -263,7 +264,24 @@ class CycleGAN():
         return loss
 
     def cycle_loss(self, y_true, y_pred):
-        loss = tf.reduce_mean(tf.abs(y_pred - y_true))
+        if self.cycle_loss_type == 'L1':
+            # L1 norm
+            loss = tf.reduce_mean(tf.abs(y_pred - y_true))
+        elif self.cycle_loss_type == 'L2':
+            # L2 norm
+            loss = tf.reduce_mean(tf.squared_difference(y_pred, y_true))
+        elif self.cycle_loss_type == 'SSIM':
+            # SSIM
+            loss = 1 - tf.image.ssim(y_pred,y_true, max_val=1.0)[0]
+        elif self.cycle_loss_type == 'L1_SSIM':
+            # L1 + SSIM
+            loss = 0.5*(1 - tf.image.ssim(y_pred,y_true, max_val=1.0)[0]) + 0.5*tf.reduce_mean(tf.abs(y_pred - y_true))
+        elif self.cycle_loss_type == 'L2_SSIM':
+            # L2 + SSIM
+            loss = 0.5*(1 - tf.image.ssim(y_pred,y_true, max_val=1.0)[0]) + 0.5*tf.reduce_mean(tf.squared_difference(y_pred, y_true))
+        elif self.cycle_loss_type == 'L1_L2_SSIM':
+            # L1 + L2 + SSIM
+            loss = 1/3*(1 - tf.image.ssim(y_pred,y_true, max_val=1.0)[0]) + 1/3*tf.reduce_mean(tf.abs(y_pred - y_true)) + 1/3*tf.reduce_mean(tf.squared_difference(y_pred, y_true))
         return loss
 
     def get_lr_linear_decay_rate(self):

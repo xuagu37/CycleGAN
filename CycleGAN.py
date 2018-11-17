@@ -155,7 +155,7 @@ class CycleGAN():
         x = ReflectionPadding2D((3, 3))(x)
         x = Conv2D(filters=self.data_shape[2], kernel_size=7, strides=1)(x)
         x = Activation('tanh')(x)  # They say they use Relu but really they do not
-        return Model(input=input_img, output=x, name=name)
+        return Model(inputs=input_img, outputs=x, name=name)
 
 
     def train(self, train_A_dir, normalization_factor_A, train_B_dir, normalization_factor_B, models_dir, batch_size=10, epochs=200, output_sample_flag=False, output_sample_dir=None):

@@ -41,7 +41,16 @@ class CycleGAN():
         self.opt_D = Adam(self.lr_D, self.beta_1, self.beta_2)
         self.opt_G = Adam(self.lr_G, self.beta_1, self.beta_2)
 
+        # TensorFlow wizardry
+        config = tf.ConfigProto()
+        # Don't pre-allocate memory; allocate as-needed
+        config.gpu_options.allow_growth = True
+        # Create a session with the above options specified.
+        session = tf.Session(config=config)
+        K.tensorflow_backend.set_session(session)
+
     def create_discriminator_and_generator(self):
+        print('Creating Discriminator and Generator ...')
         # Discriminator
         D_A = self.Discriminator()
         D_B = self.Discriminator()
@@ -158,7 +167,7 @@ class CycleGAN():
         return Model(inputs=input_img, outputs=x, name=name)
 
 
-    def train(self, train_A_dir, normalization_factor_A, train_B_dir, normalization_factor_B, models_dir, batch_size=10, epochs=200, cycle_loss_type='L1_SSIM', output_sample_flag=False, output_sample_dir=None):
+    def train(self, train_A_dir, normalization_factor_A, train_B_dir, normalization_factor_B, models_dir, batch_size=10, epochs=200, cycle_loss_type='L1', output_sample_flag=False, output_sample_dir=None):
         self.batch_size = batch_size
         self.epochs = epochs
         self.decay_epoch = self.epochs//2 # the epoch where linear decay of the learning rates starts
@@ -170,27 +179,13 @@ class CycleGAN():
         if not os.path.exists(models_dir):
             os.makedirs(models_dir)
         self.models_dir = models_dir
-        print('Loading training data A ...')
         self.train_A = load_data(self.train_A_dir)/normalization_factor_A
-        print('Loading training data B ...')
         self.train_B = load_data(self.train_B_dir)/normalization_factor_B
         self.data_shape = self.train_A.shape[1:4]
         self.data_num = self.train_A.shape[0]
         self.loop_num = self.data_num // self.batch_size
         print('Number of epochs: {}, number of loops per epoch: {}'.format(self.epochs, self.loop_num))
-        print('Creating Discriminator and Generator ...')
         self.create_discriminator_and_generator()
-        # TensorFlow wizardry
-        config = tf.ConfigProto()
-        # Don't pre-allocate memory; allocate as-needed
-        config.gpu_options.allow_growth = True
-        # Create a session with the above options specified.
-        K.tensorflow_backend.set_session(tf.Session(config=config))
-
-        DA_losses = []
-        DB_losses = []
-        D_losses = []
-        G_losses = []
 
         # Image pools used to update the discriminators
         self.synthetic_A_pool = ImagePool(self.synthetic_pool_size)
@@ -200,6 +195,7 @@ class CycleGAN():
         ones = np.ones(shape=label_shape)
         zeros = ones * 0
         decay_D, decay_G = self.get_lr_linear_decay_rate()
+
         start_time = time.time()
         print('Training ...')
         for epoch_i in range(self.epochs):
@@ -245,13 +241,17 @@ class CycleGAN():
         print('Done')
 
     def synthesize(self, G_X2Y, G_X2Y_dir, test_X_dir, normalization_factor_X, synthetic_Y_dir, normalization_factor_Y):
-        print('Loading test data ...')
         test_X_img = nib.load(test_X_dir)
         test_X = load_data(test_X_dir)/normalization_factor_X
+        self.data_shape = test_X.shape[1:4]
+        self.data_num = test_X.shape[0]
+        print('Synthesizing ...')        
         if G_X2Y == 'G_A2B':
+            self.G_A2B = self.Generator(name='G_A2B')
             self.G_A2B.load_weights(G_X2Y_dir)
             synthetic_Y = self.G_A2B.predict(test_X)
         elif G_X2Y == 'G_B2A':
+            self.G_B2A = self.Generator(name='G_B2A')
             self.G_B2A.load_weights(G_X2Y_dir)
             synthetic_Y = self.G_B2A.predict(test_X)
         synthetic_Y = np.transpose(synthetic_Y, (1, 2, 3, 0))*normalization_factor_Y
@@ -331,7 +331,7 @@ def load_data(data_dir):
         data = nib.load(data_dir).get_fdata()
         data.clip(0)
         data = np.transpose(data, (3, 0, 1, 2))
-        print('data size: {}, number of data: {}'.format(data.shape[1:4], data.shape[0]))
+        print('Loading data, data size: {}, number of data: {}'.format(data.shape[1:4], data.shape[0]))
         if (data.shape[1]%4 != 0):
             data = np.append(data, np.zeros((data.shape[0], 4-data.shape[1]%4, data.shape[2], data.shape[3])), axis=1)
         if (data.shape[2]%4 != 0):

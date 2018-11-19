@@ -1,5 +1,5 @@
 import nibabel as nib
-from keras.layers import Layer, Input, Conv2D, Activation, add, BatchNormalization, Conv2DTranspose
+from keras.layers import Dropout, Layer, Input, Conv2D, Activation, add, BatchNormalization, Conv2DTranspose, UpSampling2D
 from keras_contrib.layers.normalization import InstanceNormalization, InputSpec
 from keras.layers.advanced_activations import LeakyReLU
 from keras.optimizers import Adam
@@ -123,8 +123,12 @@ class CycleGAN():
         return x
 
     def uk(self, x, k):
-        # (up sampling followed by 1x1 convolution <=> fractional-strided 1/2)
-        x = Conv2DTranspose(filters=k, kernel_size=3, strides=2, padding='same')(x)  # this matches fractionally stided with stride 1/2
+        if self.use_resize_convolution:
+            x = UpSampling2D(size=(2, 2))(x)  # Nearest neighbor upsampling
+            x = ReflectionPadding2D((1, 1))(x)
+            x = Conv2D(filters=k, kernel_size=3, strides=1, padding='valid')(x)
+        else:
+            x = Conv2DTranspose(filters=k, kernel_size=3, strides=2, padding='same')(x)  # this matches fractionally stided with stride 1/2
         x = self.normalization(axis=3, center=True, epsilon=1e-5)(x, training=True)
         x = Activation('relu')(x)
         return x
@@ -167,11 +171,12 @@ class CycleGAN():
         return Model(inputs=input_img, outputs=x, name=name)
 
 
-    def train(self, train_A_dir, normalization_factor_A, train_B_dir, normalization_factor_B, models_dir, batch_size=10, epochs=200, cycle_loss_type='L1', output_sample_flag=False, output_sample_dir=None):
+    def train(self, train_A_dir, normalization_factor_A, train_B_dir, normalization_factor_B, models_dir, batch_size=10, epochs=200, cycle_loss_type='L1', use_resize_convolution=True, output_sample_flag=False, output_sample_dir=None):
         self.batch_size = batch_size
         self.epochs = epochs
         self.decay_epoch = self.epochs//2 # the epoch where linear decay of the learning rates starts
         self.cycle_loss_type = cycle_loss_type
+        self.use_resize_convolution = use_resize_convolution
 
         # Data dir
         self.train_A_dir = train_A_dir
@@ -179,8 +184,8 @@ class CycleGAN():
         if not os.path.exists(models_dir):
             os.makedirs(models_dir)
         self.models_dir = models_dir
-        self.train_A = load_data(self.train_A_dir)/normalization_factor_A
-        self.train_B = load_data(self.train_B_dir)/normalization_factor_B
+        self.train_A = load_data(self.train_A_dir, normalization_factor_A)
+        self.train_B = load_data(self.train_B_dir, normalization_factor_B)
         self.data_shape = self.train_A.shape[1:4]
         self.data_num = self.train_A.shape[0]
         self.loop_num = self.data_num // self.batch_size
@@ -231,9 +236,8 @@ class CycleGAN():
                 self.print_info(start_time, epoch_i, loop_j, D_loss, G_loss, DA_loss_train + DA_loss_synthetic, DB_loss_train + DB_loss_synthetic)
                 if (output_sample_flag):
                     if (loop_j+1) % 5 == 0:
-                        #output_sample = np.concatenate((np.concatenate((np.rot90(train_A_batch[0,:,:,self.data_shape[2]//3])/np.percentile(train_A_batch, 99), np.rot90(synthetic_B_batch[0,:,:,self.data_shape[2]//3])/np.percentile(synthetic_B_batch, 99)), axis=1), np.concatenate((np.rot90(train_B_batch[0,:,:,self.data_shape[2]//3])/np.percentile(train_B_batch, 99), np.rot90(synthetic_A_batch[0,:,:,self.data_shape[2]//3])/np.percentile(synthetic_A_batch, 99)), axis=1)), axis=0)
                         output_sample = np.concatenate((np.concatenate((np.rot90(train_A_batch[0,:,:,self.data_shape[2]//3]), np.rot90(synthetic_B_batch[0,:,:,self.data_shape[2]//3])), axis=1), np.concatenate((np.rot90(train_B_batch[0,:,:,self.data_shape[2]//3]), np.rot90(synthetic_A_batch[0,:,:,self.data_shape[2]//3])), axis=1)), axis=0)
-                        toimage(output_sample, cmin=0, cmax=1).save(output_sample_dir)
+                        toimage(output_sample, cmin=-1, cmax=1).save(output_sample_dir)
             if (epoch_i+1) % 20 == 0:
                 self.save_model(epoch_i)
         print("\u001b[12B")
@@ -242,10 +246,10 @@ class CycleGAN():
 
     def synthesize(self, G_X2Y, G_X2Y_dir, test_X_dir, normalization_factor_X, synthetic_Y_dir, normalization_factor_Y):
         test_X_img = nib.load(test_X_dir)
-        test_X = load_data(test_X_dir)/normalization_factor_X
+        test_X = load_data(test_X_dir, normalization_factor_X)
         self.data_shape = test_X.shape[1:4]
         self.data_num = test_X.shape[0]
-        print('Synthesizing ...')        
+        print('Synthesizing ...')
         if G_X2Y == 'G_A2B':
             self.G_A2B = self.Generator(name='G_A2B')
             self.G_A2B.load_weights(G_X2Y_dir)
@@ -254,10 +258,12 @@ class CycleGAN():
             self.G_B2A = self.Generator(name='G_B2A')
             self.G_B2A.load_weights(G_X2Y_dir)
             synthetic_Y = self.G_B2A.predict(test_X)
-        synthetic_Y = np.transpose(synthetic_Y, (1, 2, 3, 0))*normalization_factor_Y
+        synthetic_Y = (np.transpose(synthetic_Y, (1, 2, 3, 0))+1)/2*normalization_factor_Y
         synthetic_Y = synthetic_Y[0:test_X_img.shape[0], 0:test_X_img.shape[1], :, :]
         synthetic_Y_img = nib.Nifti1Image(synthetic_Y, test_X_img.affine, test_X_img.header)
         nib.save(synthetic_Y_img, synthetic_Y_dir)
+
+
 
     def lse(self, y_true, y_pred):
         loss = tf.reduce_mean(tf.squared_difference(y_pred, y_true))
@@ -327,15 +333,16 @@ class CycleGAN():
         models_dir_epoch_i = os.path.join(self.models_dir, '{}_weights_epoch_{}.hdf5'.format(self.G_B2A.name, epoch_i+1))
         self.G_B2A.save_weights(models_dir_epoch_i)
 
-def load_data(data_dir):
+def load_data(data_dir, normalization_factor):
         data = nib.load(data_dir).get_fdata()
-        data.clip(0)
+        data[data<0] = 0
+        data = data/normalization_factor*2 - 1 # normalize to [-1, 1]
         data = np.transpose(data, (3, 0, 1, 2))
         print('Loading data, data size: {}, number of data: {}'.format(data.shape[1:4], data.shape[0]))
         if (data.shape[1]%4 != 0):
-            data = np.append(data, np.zeros((data.shape[0], 4-data.shape[1]%4, data.shape[2], data.shape[3])), axis=1)
+            data = np.append(data, np.zeros((data.shape[0], 4-data.shape[1]%4, data.shape[2], data.shape[3]))-1, axis=1)
         if (data.shape[2]%4 != 0):
-            data = np.append(data, np.zeros((data.shape[0], data.shape[1], 4-data.shape[2]%4, data.shape[3])), axis=2)
+            data = np.append(data, np.zeros((data.shape[0], data.shape[1], 4-data.shape[2]%4, data.shape[3]))-1, axis=2)
         return data
 
 class ReflectionPadding2D(Layer):

@@ -127,8 +127,11 @@ class CycleGAN():
             x = UpSampling2D(size=(2, 2))(x)  # Nearest neighbor upsampling
             x = ReflectionPadding2D((1, 1))(x)
             x = Conv2D(filters=k, kernel_size=3, strides=1, padding='valid')(x)
+            #x = Dropout(0.1)(x, training=True)
         else:
             x = Conv2DTranspose(filters=k, kernel_size=3, strides=2, padding='same')(x)  # this matches fractionally stided with stride 1/2
+        # (up sampling followed by 1x1 convolution <=> fractional-strided 1/2)
+        # x = Conv2DTranspose(filters=k, kernel_size=3, strides=2, padding='same')(x)  # this matches fractionally stided with stride 1/2
         x = self.normalization(axis=3, center=True, epsilon=1e-5)(x, training=True)
         x = Activation('relu')(x)
         return x
@@ -177,7 +180,6 @@ class CycleGAN():
         self.decay_epoch = self.epochs//2 # the epoch where linear decay of the learning rates starts
         self.cycle_loss_type = cycle_loss_type
         self.use_resize_convolution = use_resize_convolution
-
         # Data dir
         self.train_A_dir = train_A_dir
         self.train_B_dir = train_B_dir

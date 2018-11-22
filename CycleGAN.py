@@ -1,3 +1,7 @@
+import os
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+# The GPU id to use, usually either "0" or "1"
+os.environ["CUDA_VISIBLE_DEVICES"]="2"
 import nibabel as nib
 from keras.layers import Dropout, Layer, Input, Conv2D, Activation, add, BatchNormalization, Conv2DTranspose, UpSampling2D
 from keras_contrib.layers.normalization import InstanceNormalization, InputSpec
@@ -13,20 +17,20 @@ import datetime
 import time
 import math
 import sys
-import os
 import keras.backend as K
 import tensorflow as tf
 import datetime
 
+
+
 tf.logging.set_verbosity(tf.logging.ERROR)
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'  # or any {'0', '1', '2'}
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 print('CycleGAN loaded...')
 
 class CycleGAN():
     def __init__(self):
-        print('Initializing a CycleGAN ...')
-
+        print('Initializing a CycleGAN on GPU ' + os.environ["CUDA_VISIBLE_DEVICES"])
         self.normalization = InstanceNormalization
         # Hyper parameters
         self.lr_D = 2e-4
@@ -174,7 +178,7 @@ class CycleGAN():
         return Model(inputs=input_img, outputs=x, name=name)
 
 
-    def train(self, train_A_dir, normalization_factor_A, train_B_dir, normalization_factor_B, models_dir, batch_size=10, epochs=200, cycle_loss_type='L1', use_resize_convolution=True, output_sample_flag=False, output_sample_dir=None):
+    def train(self, train_A_dir, normalization_factor_A, train_B_dir, normalization_factor_B, models_dir, batch_size=10, epochs=200, cycle_loss_type='L1', use_resize_convolution=True, output_sample_flag=True, output_sample_dir=None, output_sample_channels=1):
         self.batch_size = batch_size
         self.epochs = epochs
         self.decay_epoch = self.epochs//2 # the epoch where linear decay of the learning rates starts
@@ -238,7 +242,15 @@ class CycleGAN():
                 self.print_info(start_time, epoch_i, loop_j, D_loss, G_loss, DA_loss_train + DA_loss_synthetic, DB_loss_train + DB_loss_synthetic)
                 if (output_sample_flag):
                     if (loop_j+1) % 5 == 0:
-                        output_sample = np.concatenate((np.concatenate((np.rot90(train_A_batch[0,:,:,self.data_shape[2]//3]), np.rot90(synthetic_B_batch[0,:,:,self.data_shape[2]//3])), axis=1), np.concatenate((np.rot90(train_B_batch[0,:,:,self.data_shape[2]//3]), np.rot90(synthetic_A_batch[0,:,:,self.data_shape[2]//3])), axis=1)), axis=0)
+                        first_row = np.rot90(train_A_batch[0,:,:,0]) # training data A
+                        second_row = np.rot90(train_B_batch[0,:,:,0]) # training data B
+                        third_row = np.rot90(synthetic_B_batch[0,:,:,0]) # synthetic data B
+                        if output_sample_channels>1:
+                            for channel_i in range(output_sample_channels-1):
+                                first_row = np.append(first_row, np.rot90(train_A_batch[0,:,:,channel_i+1]), axis=1)
+                                second_row = np.append(second_row, np.rot90(train_B_batch[0,:,:,channel_i+1]), axis=1)
+                                third_row = np.append(third_row, np.rot90(synthetic_B_batch[0,:,:,channel_i+1]), axis=1)
+                        output_sample = np.append(np.append(first_row, second_row, axis=0), third_row, axis=0)
                         toimage(output_sample, cmin=-1, cmax=1).save(output_sample_dir)
             if (epoch_i+1) % 20 == 0:
                 self.save_model(epoch_i)
@@ -246,17 +258,18 @@ class CycleGAN():
         print("\u001b[1000D")
         print('Done')
 
-    def synthesize(self, G_X2Y, G_X2Y_dir, test_X_dir, normalization_factor_X, synthetic_Y_dir, normalization_factor_Y):
+    def synthesize(self, G_X2Y_dir, test_X_dir, normalization_factor_X, synthetic_Y_dir, normalization_factor_Y, use_resize_convolution=True):
         test_X_img = nib.load(test_X_dir)
         test_X = load_data(test_X_dir, normalization_factor_X)
         self.data_shape = test_X.shape[1:4]
         self.data_num = test_X.shape[0]
+        self.use_resize_convolution = use_resize_convolution
         print('Synthesizing ...')
-        if G_X2Y == 'G_A2B':
+        if "G_A2B" in G_X2Y_dir:
             self.G_A2B = self.Generator(name='G_A2B')
             self.G_A2B.load_weights(G_X2Y_dir)
             synthetic_Y = self.G_A2B.predict(test_X)
-        elif G_X2Y == 'G_B2A':
+        elif "G_B2A" in G_X2Y_dir:
             self.G_B2A = self.Generator(name='G_B2A')
             self.G_B2A.load_weights(G_X2Y_dir)
             synthetic_Y = self.G_B2A.predict(test_X)
@@ -264,7 +277,7 @@ class CycleGAN():
         synthetic_Y = synthetic_Y[0:test_X_img.shape[0], 0:test_X_img.shape[1], :, :]
         synthetic_Y_img = nib.Nifti1Image(synthetic_Y, test_X_img.affine, test_X_img.header)
         nib.save(synthetic_Y_img, synthetic_Y_dir)
-
+        print('Done\n')
 
 
     def lse(self, y_true, y_pred):
@@ -338,7 +351,12 @@ class CycleGAN():
 def load_data(data_dir, normalization_factor):
         data = nib.load(data_dir).get_fdata()
         data[data<0] = 0
-        data = data/normalization_factor*2 - 1 # normalize to [-1, 1]
+        if np.array(normalization_factor).size == 1:
+            data = data/normalization_factor
+        else:
+            for i in range(data.shape[2]):
+                data[:,:,i,:] = data[:,:,i,:]/normalization_factor[i] # normalize data for each channel
+        data = data*2-1 # Normalize data to [-1, 1]
         data = np.transpose(data, (3, 0, 1, 2))
         print('Loading data, data size: {}, number of data: {}'.format(data.shape[1:4], data.shape[0]))
         if (data.shape[1]%4 != 0):
@@ -346,6 +364,8 @@ def load_data(data_dir, normalization_factor):
         if (data.shape[2]%4 != 0):
             data = np.append(data, np.zeros((data.shape[0], data.shape[1], 4-data.shape[2]%4, data.shape[3]))-1, axis=2)
         return data
+
+
 
 class ReflectionPadding2D(Layer):
     def __init__(self, padding=(1, 1), **kwargs):

@@ -5,29 +5,21 @@ from CycleGAN import *
 # Create a CycleGAN
 myCycleGAN = CycleGAN()
 
-# Nifti data have the size [X, Y, C, N]
-# [X, Y] is the slice size
-# C is the channel size
-# N is the number of data
-
-# Train
-trainA_dir = '/home/xuagu37/CycleGAN/data/T1_subject_1_1000_slice_66.nii.gz'
-trainB_dir = '/home/xuagu37/CycleGAN/data/FA_subject_1_1000_slice_66.nii.gz'
-models_dir = '/home/xuagu37/CycleGAN/models'
-batch_size = 2
-epochs = 100
-output_sample_flag = True
-output_sample_dir = '/home/xuagu37/CycleGAN/output_sample.png'
-normalization_factor_A = 1000 # data/normalization_factor_A should be in [0, 1]
+trainA_dir = '/mnt/wd12t/CycleGAN/HCP/data/T1_subject_1001_1065_slice_66.nii.gz'
+trainB_dir = '/mnt/wd12t/CycleGAN/HCP/data/FA_subject_1001_1065_slice_66.nii.gz'
+models_dir = '/mnt/wd12t/CycleGAN/HCP/train_subject_1001_1065_slice_66_T1_FA_us/models'
+batch_size = 10
+epochs = 200
+output_sample_dir = '/mnt/wd12t/CycleGAN/HCP/train_subject_1001_1065_slice_66_T1_FA_us/output_sample.png'
+normalization_factor_A = 1000
 normalization_factor_B = 1
-cycle_loss_type = 'L1'
-myCycleGAN.train(trainA_dir, normalization_factor_A, trainB_dir, normalization_factor_B, models_dir, batch_size, epochs, cycle_loss_type, output_sample_flag, output_sample_dir)
+myCycleGAN.train(trainA_dir, normalization_factor_A, trainB_dir, normalization_factor_B, models_dir, batch_size, epochs, output_sample_dir=output_sample_dir, output_sample_channels=1, use_supervised_learning=True)
 
-# Synthesize from X to Y
-G_X2Y = 'G_A2B'
-G_X2Y_dir = '/home/xuagu37/CycleGAN/models/G_A2B_weights_epoch_40.hdf5'
-test_X_dir = '/home/xuagu37/CycleGAN/data/T1_subject_1001_1065_slice_66.nii.gz'
-normalization_factor_X = 1000
-synthetic_Y_dir = '/home/xuagu37/CycleGAN/data/FA_subject_1001_1065_slice_66.nii.gz'
-normalization_factor_Y = 1
-myCycleGAN.synthesize(G_X2Y, G_X2Y_dir, test_X_dir, normalization_factor_X, synthetic_Y_dir, normalization_factor_Y)
+for epoch in range(20, 201, 20):
+    G_X2Y_dir = '/mnt/wd12t/CycleGAN/HCP/train_subject_1_1000_slice_66_T1_FA_us/models/G_A2B_weights_epoch_' + str(epoch) + '.hdf5'
+    print(G_X2Y_dir)
+    test_X_dir = '/mnt/wd12t/CycleGAN/HCP/data/T1_subject_1001_1065_slice_66.nii.gz'
+    normalization_factor_X = 1000
+    synthetic_Y_dir = '/mnt/wd12t/CycleGAN/HCP/train_subject_1_1000_slice_66_T1_FA_us/synthetic/FA_synthetic_train_subject_1_1000_slice_66_test_subject_1001_1065_slice_66_epoch_' + str(epoch) + '.nii.gz'
+    normalization_factor_Y = 1
+    myCycleGAN.synthesize(G_X2Y_dir, test_X_dir, normalization_factor_X, synthetic_Y_dir, normalization_factor_Y)

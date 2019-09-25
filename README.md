@@ -22,13 +22,13 @@ trainB_dir = '/mnt/wd12t/CycleGAN/HCP/data/FA_subject_1_1000_slice_66.nii.gz'
 models_dir = '/mnt/wd12t/CycleGAN/HCP/train_subject_1_1000_slice_66_T1_FA_us/models'  
 output_sample_dir = '/mnt/wd12t/CycleGAN/HCP/train_subject_1001_1065_slice_66_T1_FA_us/output_sample.png'  
 
-\# Set training parameters
+\# Set training parameters  
 batch_size = 10  
 epochs = 200  
 normalization_factor_A = 1000  
 normalization_factor_B = 1  
 
-\# Start training
+\# Start training  
 myCycleGAN.train(trainA_dir, normalization_factor_A, trainB_dir, normalization_factor_B, models_dir, batch_size, epochs, output_sample_dir=output_sample_dir, output_sample_channels=1)
 
 

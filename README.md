@@ -1,5 +1,5 @@
 # A Keras CycleGAN for nifti data  
-We provide Keras implementation for unpaired and image-to-image translation, i.e. CycleGAN [1], for nifti data.
+We provide a Keras implementation for unpaired and image-to-image translation, i.e. CycleGAN [1], for nifti data.
 
 
 

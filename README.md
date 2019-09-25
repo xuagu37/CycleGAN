@@ -8,6 +8,6 @@ We provide a Keras implementation for unpaired and image-to-image translation, i
 
 
 
-[1] Zhu, J.Y., Park, T., Isola, P. and Efros, A.A., 2017. Unpaired Image-to-Image Translation Using Cycle-Consistent Adversarial Networks. In 2017 IEEE International Conference on Computer Vision (ICCV) (pp. 2242-2251). IEEE.
-
+[1] Zhu, J.Y., Park, T., Isola, P. and Efros, A.A., 2017. Unpaired Image-to-Image Translation Using Cycle-Consistent Adversarial Networks. In 2017 IEEE International Conference on Computer Vision (ICCV) (pp. 2242-2251). IEEE.  
+[2] Gu, X., Knutsson, H., Nilsson, M. and Eklund, A., 2019. Generating diffusion MRI scalar maps from T1 weighted images using generative adversarial networks. In Scandinavian Conference on Image Analysis (pp. 489-498). Springer, Cham.
 

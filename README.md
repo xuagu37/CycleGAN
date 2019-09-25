@@ -34,20 +34,21 @@ myCycleGAN.train(trainA_dir, normalization_factor_A, trainB_dir, normalization_f
 ```
 
 ### Synthesize  
-\# Set directory to the trained model  
+```python
+# Set directory to the trained model  
 G_X2Y_dir = '/home/xuagu37/CycleGAN/train_T1_FA/models/G_A2B_weights_epoch_100.hdf5'  
 
-\# Set directory to the test data  
+# Set directory to the test data  
 test_X_dir = '/home/xuagu37/CycleGAN/data/T1_test.nii.gz'  
 
-\# Set directory to save the synthetic data  
+# Set directory to save the synthetic data  
 synthetic_Y_dir ='/home/xuagu37/CycleGAN/train_T1_FA/synthetic/FA_synthetic.nii.gz'  
 
-\# Synthesize
+# Synthesize
 normalization_factor_X = 1000   
 normalization_factor_Y = 1  
 myCycleGAN.synthesize(G_X2Y_dir, test_X_dir, normalization_factor_X, synthetic_Y_dir, normalization_factor_Y)  
-
+```
 
 
 ## References

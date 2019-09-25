@@ -13,10 +13,9 @@ The created training data will have the size of [X, Y, 1, 1000].
 ![T1_subject_1_1000_slice_66](https://github.com/xuagu37/CycleGAN/blob/master/images/T1_subject_1_1000_slice_66.png)
 
 ### Training  
-\# Create a CycleGAN on GPU 0 
 ```python
+\# Create a CycleGAN on GPU 0 
 myCycleGAN = CycleGAN(0) 
-```
 
 \# Set directories  
 trainA_dir = '/home/xuagu37/CycleGAN/data/T1_training.nii.gz'  
@@ -32,7 +31,7 @@ normalization_factor_B = 1
 
 \# Start training  
 myCycleGAN.train(trainA_dir, normalization_factor_A, trainB_dir, normalization_factor_B, models_dir, batch_size, epochs, output_sample_dir=output_sample_dir, output_sample_channels=1)
-
+```
 
 ### Synthesize  
 \# Set directory to the trained model  

@@ -17,10 +17,10 @@ The created training data will have the size of [X, Y, 1, 1000].
 myCycleGAN = CycleGAN(0) 
 
 \# Set directories  
-trainA_dir = '/mnt/wd12t/CycleGAN/HCP/data/T1_subject_1_1000_slice_66.nii.gz'  
-trainB_dir = '/mnt/wd12t/CycleGAN/HCP/data/FA_subject_1_1000_slice_66.nii.gz'  
-models_dir = '/mnt/wd12t/CycleGAN/HCP/train_subject_1_1000_slice_66_T1_FA_us/models'  
-output_sample_dir = '/mnt/wd12t/CycleGAN/HCP/train_subject_1001_1065_slice_66_T1_FA_us/output_sample.png'  
+trainA_dir = '/home/xuagu37/CycleGAN/data/T1_training.nii.gz'  
+trainB_dir = '/home/xuagu37/CycleGAN/data/FA_training.nii.gz'  
+models_dir = '/home/xuagu37/CycleGAN/train_T1_FA/models'  
+output_sample_dir = '/home/xuagu37/CycleGAN/train_T1_FA/output_sample.png'  
 
 \# Set training parameters  
 batch_size = 10  
@@ -32,8 +32,20 @@ normalization_factor_B = 1
 myCycleGAN.train(trainA_dir, normalization_factor_A, trainB_dir, normalization_factor_B, models_dir, batch_size, epochs, output_sample_dir=output_sample_dir, output_sample_channels=1)
 
 
-### Synthesize
+### Synthesize  
+\# Set directory to the trained model  
+G_X2Y_dir = '/home/xuagu37/CycleGAN/train_T1_FA/models/G_A2B_weights_epoch_100.hdf5'  
 
+\# Set directory to the test data  
+test_X_dir = '/home/xuagu37/CycleGAN/data/T1_test.nii.gz'  
+
+\# Set directory to save the synthetic data  
+synthetic_Y_dir ='/home/xuagu37/CycleGAN/train_T1_FA/synthetic/FA_synthetic.nii.gz'  
+
+\# Synthesize
+normalization_factor_X = 1000   
+normalization_factor_Y = 1  
+myCycleGAN.synthesize(G_X2Y_dir, test_X_dir, normalization_factor_X, synthetic_Y_dir, normalization_factor_Y)  
 
 
 

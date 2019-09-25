@@ -13,8 +13,10 @@ The created training data will have the size of [X, Y, 1, 1000].
 ![T1_subject_1_1000_slice_66](https://github.com/xuagu37/CycleGAN/blob/master/images/T1_subject_1_1000_slice_66.png)
 
 ### Training  
-\# Create a CycleGAN on GPU 0  
+\# Create a CycleGAN on GPU 0 
+```python
 myCycleGAN = CycleGAN(0) 
+```
 
 \# Set directories  
 trainA_dir = '/home/xuagu37/CycleGAN/data/T1_training.nii.gz'  

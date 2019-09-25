@@ -1,6 +1,6 @@
 # A Keras CycleGAN for nifti data  
 We provide a Keras implementation for unpaired and image-to-image translation, i.e. CycleGAN [1], for nifti data.  
-The CycleGAN can be trained to generate synthetic diffusion MRI scalar maps from structural T1-weighted images, see our paper [2].
+We proposed an application of CycleGAN to generate synthetic diffusion MRI scalar maps from structural T1-weighted images, see our paper [2].
 
 
 

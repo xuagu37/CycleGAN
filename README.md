@@ -3,7 +3,7 @@ We provide a Keras implementation for unpaired and image-to-image translation, i
 We proposed an application of CycleGAN to generate synthetic diffusion MRI scalar maps from structural T1-weighted images, see our paper [2].
 
 
-
+## Getting started
 
 
 

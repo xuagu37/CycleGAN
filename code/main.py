@@ -13,7 +13,7 @@ batch_size = 10
 epochs = 200
 normalization_factor_A = 1000
 normalization_factor_B = 1
-myCycleGAN.train(trainA_dir, normalization_factor_A, trainB_dir, normalization_factor_B, models_dir, batch_size, epochs, output_sample_dir=output_sample_dir, output_sample_channels=1, use_supervised_learning=True)
+myCycleGAN.train(trainA_dir, normalization_factor_A, trainB_dir, normalization_factor_B, models_dir, batch_size, epochs, output_sample_dir=output_sample_dir, output_sample_channels=1)
 
 for epoch in range(20, 201, 20):
     G_X2Y_dir = '/mnt/wd12t/CycleGAN/HCP/train_subject_1_1000_slice_66_T1_FA_us/models/G_A2B_weights_epoch_' + str(epoch) + '.hdf5'

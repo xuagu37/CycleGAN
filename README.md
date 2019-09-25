@@ -6,7 +6,11 @@ We proposed an application of CycleGAN to generate synthetic diffusion MRI scala
 ![T1 to FA/MD](https://github.com/xuagu37/CycleGAN/blob/master/images/T1_FA_MD.jpg)
 
 ## Getting started
-### Prepare training data
+### Prepare training data  
+We prepare the training data by stacking subjects on the fourth dimention.  
+For example, we extract 1 slice from each subject for 1000 subject and then stack all slices to the fourth dimention.  
+The created training data will have the size of [X,Y,1,1000].  
+![T1_subject_1_1000_slice_66](https://github.com/xuagu37/CycleGAN/blob/master/images/T1_subject_1_1000_slice_66.png)
 
 ### Training
 

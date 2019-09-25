@@ -8,11 +8,29 @@ We proposed an application of CycleGAN to generate synthetic diffusion MRI scala
 ## Getting started
 ### Prepare training data  
 We prepare the training data by stacking subjects on the fourth dimention.  
-For example, we extract 1 slice from each subject for 1000 subject and then stack all slices to the fourth dimention.  
+For example, we extract 1 slice from each subject for 1000 subjects and then stack all slices to the fourth dimention.  
 The created training data will have the size of [X, Y, 1, 1000].  
 ![T1_subject_1_1000_slice_66](https://github.com/xuagu37/CycleGAN/blob/master/images/T1_subject_1_1000_slice_66.png)
 
-### Training
+### Training  
+\# Create a CycleGAN on GPU 0  
+myCycleGAN = CycleGAN(0) 
+
+\# Set directories  
+trainA_dir = '/mnt/wd12t/CycleGAN/HCP/data/T1_subject_1_1000_slice_66.nii.gz'  
+trainB_dir = '/mnt/wd12t/CycleGAN/HCP/data/FA_subject_1_1000_slice_66.nii.gz'  
+models_dir = '/mnt/wd12t/CycleGAN/HCP/train_subject_1_1000_slice_66_T1_FA_us/models'  
+output_sample_dir = '/mnt/wd12t/CycleGAN/HCP/train_subject_1001_1065_slice_66_T1_FA_us/output_sample.png'  
+
+\# Set training parameters
+batch_size = 10  
+epochs = 200  
+normalization_factor_A = 1000  
+normalization_factor_B = 1  
+
+\# Start training
+myCycleGAN.train(trainA_dir, normalization_factor_A, trainB_dir, normalization_factor_B, models_dir, batch_size, epochs, output_sample_dir=output_sample_dir, output_sample_channels=1)
+
 
 ### Synthesize
 

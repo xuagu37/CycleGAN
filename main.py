@@ -2,12 +2,12 @@
 import CycleGAN
 from CycleGAN import *
 
-# Create a CycleGAN
-myCycleGAN = CycleGAN()
+# Create a CycleGAN on GPU 0
+myCycleGAN = CycleGAN(0)
 
-trainA_dir = '/mnt/wd12t/CycleGAN/HCP/data/T1_subject_1001_1065_slice_66.nii.gz'
-trainB_dir = '/mnt/wd12t/CycleGAN/HCP/data/FA_subject_1001_1065_slice_66.nii.gz'
-models_dir = '/mnt/wd12t/CycleGAN/HCP/train_subject_1001_1065_slice_66_T1_FA_us/models'
+trainA_dir = '/mnt/wd12t/CycleGAN/HCP/data/T1_subject_1_1000_slice_66.nii.gz'
+trainB_dir = '/mnt/wd12t/CycleGAN/HCP/data/FA_subject_1_1000_slice_66.nii.gz'
+models_dir = '/mnt/wd12t/CycleGAN/HCP/train_subject_1_1000_slice_66_T1_FA_us/models'
 batch_size = 10
 epochs = 200
 output_sample_dir = '/mnt/wd12t/CycleGAN/HCP/train_subject_1001_1065_slice_66_T1_FA_us/output_sample.png'

@@ -14,22 +14,22 @@ The created training data will have the size of [X, Y, 1, 1000].
 
 ### Training  
 ```python
-\# Create a CycleGAN on GPU 0 
+# Create a CycleGAN on GPU 0 
 myCycleGAN = CycleGAN(0) 
 
-\# Set directories  
+# Set directories  
 trainA_dir = '/home/xuagu37/CycleGAN/data/T1_training.nii.gz'  
 trainB_dir = '/home/xuagu37/CycleGAN/data/FA_training.nii.gz'  
 models_dir = '/home/xuagu37/CycleGAN/train_T1_FA/models'  
 output_sample_dir = '/home/xuagu37/CycleGAN/train_T1_FA/output_sample.png'  
 
-\# Set training parameters  
+# Set training parameters  
 batch_size = 10  
 epochs = 200  
 normalization_factor_A = 1000  
 normalization_factor_B = 1  
 
-\# Start training  
+# Start training  
 myCycleGAN.train(trainA_dir, normalization_factor_A, trainB_dir, normalization_factor_B, models_dir, batch_size, epochs, output_sample_dir=output_sample_dir, output_sample_channels=1)
 ```
 

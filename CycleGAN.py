@@ -1,7 +1,7 @@
 import os
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 # The GPU id to use, usually either "0" or "1"
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+# os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import nibabel as nib
 from keras.layers import Dropout, Layer, Input, Conv2D, Activation, add, BatchNormalization, Conv2DTranspose, UpSampling2D
 from keras_contrib.layers.normalization import InstanceNormalization, InputSpec
@@ -29,7 +29,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 print('CycleGAN loaded...')
 
 class CycleGAN():
-    def __init__(self):
+    def __init__(self, selected_gpu):
+        os.environ["CUDA_VISIBLE_DEVICES"]=str(selected_gpu)
         print('Initializing a CycleGAN on GPU ' + os.environ["CUDA_VISIBLE_DEVICES"])
         self.normalization = InstanceNormalization
         # Hyper parameters
@@ -101,8 +102,8 @@ class CycleGAN():
         self.G_model = Model(inputs=[real_A, real_B], outputs=model_outputs, name='G_model')
         self.G_model.compile(optimizer=self.opt_G, loss=compile_losses, loss_weights=compile_weights)
 
-    def ck(self, x, k, use_normalization):
-        x = Conv2D(filters=k, kernel_size=4, strides=2, padding='same')(x)
+    def ck(self, x, k, use_normalization, stride):
+        x = Conv2D(filters=k, kernel_size=4, strides=stride, padding='same', use_bias=True)(x)
         # Normalization is not done on the first discriminator layer
         if use_normalization:
             x = self.normalization(axis=3, center=True, epsilon=1e-5)(x, training=True)
@@ -110,13 +111,13 @@ class CycleGAN():
         return x
 
     def c7Ak(self, x, k):
-        x = Conv2D(filters=k, kernel_size=7, strides=1, padding='valid')(x)
+        x = Conv2D(filters=k, kernel_size=7, strides=1, padding='valid', use_bias=True)(x)
         x = self.normalization(axis=3, center=True, epsilon=1e-5)(x, training=True)
         x = Activation('relu')(x)
         return x
 
     def dk(self, x, k):
-        x = Conv2D(filters=k, kernel_size=3, strides=2, padding='same')(x)
+        x = Conv2D(filters=k, kernel_size=3, strides=2, padding='same', use_bias=True)(x)
         x = self.normalization(axis=3, center=True, epsilon=1e-5)(x, training=True)
         x = Activation('relu')(x)
         return x
@@ -124,11 +125,13 @@ class CycleGAN():
     def Rk(self, x0):
         k = int(x0.shape[-1])
         # first layer
-        x = Conv2D(filters=k, kernel_size=3, strides=1, padding='same')(x0)
+        x = ReflectionPadding2D((1,1))(x0)
+        x = Conv2D(filters=k, kernel_size=3, strides=1, padding='valid', use_bias=True)(x)
         x = self.normalization(axis=3, center=True, epsilon=1e-5)(x, training=True)
         x = Activation('relu')(x)
         # second layer
-        x = Conv2D(filters=k, kernel_size=3, strides=1, padding='same')(x)
+        x = ReflectionPadding2D((1, 1))(x)
+        x = Conv2D(filters=k, kernel_size=3, strides=1, padding='valid', use_bias=True)(x)
         x = self.normalization(axis=3, center=True, epsilon=1e-5)(x, training=True)
         # merge
         x = add([x, x0])
@@ -138,10 +141,10 @@ class CycleGAN():
         if self.use_resize_convolution:
             x = UpSampling2D(size=(2, 2))(x)  # Nearest neighbor upsampling
             x = ReflectionPadding2D((1, 1))(x)
-            x = Conv2D(filters=k, kernel_size=3, strides=1, padding='valid')(x)
+            x = Conv2D(filters=k, kernel_size=3, strides=1, padding='valid', use_bias=True)(x)
             #x = Dropout(0.1)(x, training=True)
         else:
-            x = Conv2DTranspose(filters=k, kernel_size=3, strides=2, padding='same')(x)  # this matches fractionally stided with stride 1/2
+            x = Conv2DTranspose(filters=k, kernel_size=3, strides=2, padding='same', use_bias=True)(x)  # this matches fractionally stided with stride 1/2
         # (up sampling followed by 1x1 convolution <=> fractional-strided 1/2)
         # x = Conv2DTranspose(filters=k, kernel_size=3, strides=2, padding='same')(x)  # this matches fractionally stided with stride 1/2
         x = self.normalization(axis=3, center=True, epsilon=1e-5)(x, training=True)
@@ -152,15 +155,15 @@ class CycleGAN():
         # Specify input
         input_img = Input(shape=self.data_shape)
         # Layer 1 (#Instance normalization is not used for this layer)
-        x = self.ck(input_img, 64, False)
+        x = self.ck(input_img, 64, False, 2)
         # Layer 2
-        x = self.ck(x, 128, True)
+        x = self.ck(x, 128, True, 2)
         # Layer 3
-        x = self.ck(x, 256, True)
+        x = self.ck(x, 256, True, 2)
         # Layer 4
-        x = self.ck(x, 512, True)
+        x = self.ck(x, 512, True, 1)
         # Output layer
-        x = Conv2D(filters=1, kernel_size=4, strides=1, padding='same')(x)
+        x = Conv2D(filters=1, kernel_size=4, strides=1, padding='same', use_bias=True)(x)
         x = Activation('sigmoid')(x)
         return Model(inputs=input_img, outputs=x, name=name)
 
@@ -182,7 +185,7 @@ class CycleGAN():
         # Layer 14
         x = self.uk(x, 32)
         x = ReflectionPadding2D((3, 3))(x)
-        x = Conv2D(filters=self.data_shape[2], kernel_size=7, strides=1)(x)
+        x = Conv2D(filters=self.data_shape[2], kernel_size=7, strides=1, padding='valid', use_bias=True)(x)
         x = Activation('tanh')(x)  # They say they use Relu but really they do not
         return Model(inputs=input_img, outputs=x, name=name)
 
@@ -220,8 +223,8 @@ class CycleGAN():
         decay_D, decay_G = self.get_lr_linear_decay_rate()
 
         start_time = time.time()
-        print('Training ...')
         print("Dropout rate: {}".format(dropout_rate))
+        print('Training ...')
         for epoch_i in range(self.epochs):
             # Update learning rates
             if epoch_i > self.decay_epoch:

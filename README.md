@@ -10,7 +10,7 @@ We proposed an application of CycleGAN to generate synthetic diffusion MRI scala
 
 ### Training
 
-#### Synthesize
+### Synthesize
 
 
 
